@@ -6,7 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Globalization;
 
-namespace CobolModernization.Helpers
+namespace CobolToQuarkusMigration.Helpers
 {
     /// <summary>
     /// Combines all log files into a readable conversation format where agents appear to communicate their findings

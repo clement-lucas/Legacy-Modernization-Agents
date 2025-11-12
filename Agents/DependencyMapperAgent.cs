@@ -1,14 +1,14 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
-using CobolModernization.Agents.Interfaces;
-using CobolModernization.Models;
-using CobolModernization.Helpers;
+using CobolToQuarkusMigration.Agents.Interfaces;
+using CobolToQuarkusMigration.Models;
+using CobolToQuarkusMigration.Helpers;
 using System.Text.RegularExpressions;
 using System.Text;
 using System.Diagnostics;
 
-namespace CobolModernization.Agents;
+namespace CobolToQuarkusMigration.Agents;
 
 /// <summary>
 /// Implementation of the COBOL dependency mapper agent with enhanced API call tracking.

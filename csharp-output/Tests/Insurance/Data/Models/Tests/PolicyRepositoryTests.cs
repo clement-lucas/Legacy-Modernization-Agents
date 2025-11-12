@@ -20,32 +20,74 @@ namespace Insurance.Data.Models.Tests
         private readonly Mock<DbSet<Policy>> _dbSetMock;
         private readonly Mock<ILogger<PolicyRepository>> _loggerMock;
         private readonly PolicyRepository _repository;
-        private readonly List<Policy> _policyData;
+
+        private readonly List<Policy> _policyStore;
 
         public PolicyRepositoryTests()
         {
-            _policyData = new List<Policy>
-            {
-                CreatePolicy("POL000001"),
-                CreatePolicy("POL000002"),
-                CreatePolicy("POL000003")
-            };
-
-            _dbSetMock = CreateDbSetMock(_policyData);
+            _policyStore = new List<Policy>();
+            _dbSetMock = new Mock<DbSet<Policy>>();
             _dbContextMock = new Mock<InsuranceDbContext>();
-            _dbContextMock.Setup(x => x.Policies).Returns(_dbSetMock.Object);
-
             _loggerMock = new Mock<ILogger<PolicyRepository>>();
+
+            SetupDbSetMock();
+
+            _dbContextMock.Setup(c => c.Policies).Returns(_dbSetMock.Object);
 
             _repository = new PolicyRepository(_dbContextMock.Object, _loggerMock.Object);
         }
 
-        public void Dispose()
+        private void SetupDbSetMock()
         {
-            // Cleanup if needed
+            var queryable = _policyStore.AsQueryable();
+
+            _dbSetMock.As<IQueryable<Policy>>().Setup(m => m.Provider).Returns(queryable.Provider);
+            _dbSetMock.As<IQueryable<Policy>>().Setup(m => m.Expression).Returns(queryable.Expression);
+            _dbSetMock.As<IQueryable<Policy>>().Setup(m => m.ElementType).Returns(queryable.ElementType);
+            _dbSetMock.As<IQueryable<Policy>>().Setup(m => m.GetEnumerator()).Returns(() => queryable.GetEnumerator());
+
+            _dbSetMock.Setup(d => d.AsNoTracking()).Returns(_dbSetMock.Object);
+
+            _dbSetMock.Setup(d => d.ToListAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(() => _policyStore.ToList());
+
+            _dbSetMock.Setup(d => d.FindAsync(It.IsAny<object[]>()))
+                .ReturnsAsync((object[] keys) =>
+                {
+                    var policyNumber = keys[0] as string;
+                    return _policyStore.FirstOrDefault(p => p.PolicyNumber == policyNumber);
+                });
+
+            _dbSetMock.Setup(d => d.AddAsync(It.IsAny<Policy>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((Policy policy, CancellationToken _) =>
+                {
+                    _policyStore.Add(policy);
+                    var entryMock = new Mock<EntityEntry<Policy>>();
+                    entryMock.Setup(e => e.Entity).Returns(policy);
+                    return entryMock.Object;
+                });
+
+            _dbSetMock.Setup(d => d.Update(It.IsAny<Policy>()))
+                .Callback((Policy policy) =>
+                {
+                    var idx = _policyStore.FindIndex(p => p.PolicyNumber == policy.PolicyNumber);
+                    if (idx >= 0)
+                        _policyStore[idx] = policy;
+                });
+
+            _dbSetMock.Setup(d => d.Remove(It.IsAny<Policy>()))
+                .Callback((Policy policy) =>
+                {
+                    _policyStore.RemoveAll(p => p.PolicyNumber == policy.PolicyNumber);
+                });
         }
 
-        private static Policy CreatePolicy(string policyNumber)
+        public void Dispose()
+        {
+            _policyStore.Clear();
+        }
+
+        private Policy CreateTestPolicy(string policyNumber = "P123456789")
         {
             return new Policy
             {
@@ -56,67 +98,46 @@ namespace Insurance.Data.Models.Tests
                 PolicyBeneficiaryName = "Jane Doe",
                 PolicyBeneficiaryRelation = "Spouse",
                 PolicyHolderAddress1 = "123 Main St",
-                PolicyHolderAddress2 = "Apt 4",
-                PolicyHolderCity = "Springfield",
-                PolicyHolderState = "IL",
-                PolicyHolderZipCode = "62704",
+                PolicyHolderAddress2 = "Apt 4B",
+                PolicyHolderCity = "Metropolis",
+                PolicyHolderState = "NY",
+                PolicyHolderZipCode = "10001",
                 PolicyHolderDateOfBirth = "1980-01-01",
                 PolicyHolderGender = "Male",
                 PolicyHolderPhone = "5551234567",
-                PolicyHolderEmail = "john.doe@email.com",
+                PolicyHolderEmail = "john.doe@example.com",
                 PolicyPaymentFrequency = "Monthly",
                 PolicyPaymentMethod = "Credit",
                 PolicyUnderwriter = "Acme Insurance",
                 PolicyTermsAndConditions = "Standard terms apply.",
                 PolicyClaimed = "N",
                 PolicyDiscountCode = "DISC10",
-                PolicyPremiumAmount = 120.50m,
-                PolicyCoverageAmount = 10000.00m,
+                PolicyPremiumAmount = 1234.56m,
+                PolicyCoverageAmount = 100000m,
                 PolicyType = "Life",
-                PolicyStartDate = new DateTime(2023, 1, 1),
-                PolicyExpiryDate = new DateTime(2024, 1, 1),
+                PolicyStartDate = DateTime.Today.AddYears(-1),
+                PolicyExpiryDate = DateTime.Today.AddYears(1),
                 PolicyStatus = "A",
                 PolicyAgentCode = "AGT001",
                 PolicyNotifyFlag = "Y",
-                PolicyAddTimestamp = DateTimeOffset.UtcNow,
-                PolicyUpdateTimestamp = DateTimeOffset.UtcNow
+                PolicyAddTimestamp = DateTime.Now.AddMonths(-1),
+                PolicyUpdateTimestamp = DateTime.Now
             };
-        }
-
-        private static Mock<DbSet<T>> CreateDbSetMock<T>(IEnumerable<T> data) where T : class
-        {
-            var queryable = data.AsQueryable();
-
-            var dbSetMock = new Mock<DbSet<T>>();
-            dbSetMock.As<IQueryable<T>>().Setup(m => m.Provider).Returns(queryable.Provider);
-            dbSetMock.As<IQueryable<T>>().Setup(m => m.Expression).Returns(queryable.Expression);
-            dbSetMock.As<IQueryable<T>>().Setup(m => m.ElementType).Returns(queryable.ElementType);
-            dbSetMock.As<IQueryable<T>>().Setup(m => m.GetEnumerator()).Returns(queryable.GetEnumerator());
-
-            dbSetMock.Setup(d => d.AddAsync(It.IsAny<T>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync((T entity, CancellationToken _) =>
-                {
-                    ((List<T>)data).Add(entity);
-                    var entityEntryMock = new Mock<EntityEntry<T>>();
-                    entityEntryMock.Setup(e => e.Entity).Returns(entity);
-                    return entityEntryMock.Object;
-                });
-
-            return dbSetMock;
         }
 
         [Fact]
         public async Task GetPolicyByNumberAsync_ShouldReturnPolicy_WhenPolicyExists()
         {
             // Arrange
-            var policyNumber = "POL000001";
+            var policy = CreateTestPolicy();
+            _policyStore.Add(policy);
 
             // Act
-            var result = await _repository.GetPolicyByNumberAsync(policyNumber);
+            var result = await _repository.GetPolicyByNumberAsync(policy.PolicyNumber);
 
             // Assert
             result.Should().NotBeNull();
-            result!.PolicyNumber.Should().Be(policyNumber);
+            result.Should().BeEquivalentTo(policy);
         }
 
         [Fact]
@@ -132,266 +153,279 @@ namespace Insurance.Data.Models.Tests
             result.Should().BeNull();
         }
 
-        [Theory]
-        [InlineData(null)]
-        [InlineData("")]
-        [InlineData(" ")]
-        public async Task GetPolicyByNumberAsync_ShouldReturnNull_ForNullOrEmptyPolicyNumber(string policyNumber)
-        {
-            // Arrange & Act
-            var result = await _repository.GetPolicyByNumberAsync(policyNumber);
-
-            // Assert
-            result.Should().BeNull();
-        }
-
         [Fact]
-        public async Task GetPolicyByNumberAsync_ShouldLogAndThrowRepositoryException_OnDbException()
+        public async Task GetPolicyByNumberAsync_ShouldThrowDataAccessException_OnDbException()
         {
             // Arrange
-            var policyNumber = "POL000001";
-            _dbSetMock.As<IQueryable<Policy>>()
-                .Setup(m => m.Provider)
-                .Throws(new InvalidOperationException("DB error"));
+            _dbSetMock.Setup(d => d.FindAsync(It.IsAny<object[]>()))
+                .ThrowsAsync(new InvalidOperationException("DB error"));
 
             // Act
-            Func<Task> act = async () => await _repository.GetPolicyByNumberAsync(policyNumber);
+            Func<Task> act = async () => await _repository.GetPolicyByNumberAsync("P123456789");
 
             // Assert
-            var ex = await Assert.ThrowsAsync<RepositoryException>(act);
-            ex.Message.Should().Contain(policyNumber);
+            await act.Should().ThrowAsync<DataAccessException>()
+                .WithMessage("Failed to retrieve policy P123456789*");
             _loggerMock.Verify(
-                l => l.LogError(It.IsAny<Exception>(), It.IsAny<string>(), policyNumber),
-                Times.Once);
+                l => l.LogError(It.IsAny<Exception>(), It.IsAny<string>(), It.IsAny<object[]>()), Times.Once);
         }
 
         [Fact]
-        public async Task GetAllPoliciesAsync_ShouldReturnAllPoliciesOrderedByPolicyNumber()
+        public async Task GetAllPoliciesAsync_ShouldReturnAllPolicies()
         {
             // Arrange
-            var expectedOrder = _policyData.OrderBy(p => p.PolicyNumber).ToList();
+            var policy1 = CreateTestPolicy("P1");
+            var policy2 = CreateTestPolicy("P2");
+            _policyStore.Add(policy1);
+            _policyStore.Add(policy2);
 
             // Act
             var result = await _repository.GetAllPoliciesAsync();
 
             // Assert
-            result.Should().HaveCount(_policyData.Count);
-            result.Should().BeInAscendingOrder(p => p.PolicyNumber);
-            result.Should().BeEquivalentTo(expectedOrder);
+            result.Should().HaveCount(2);
+            result.Should().ContainEquivalentOf(policy1);
+            result.Should().ContainEquivalentOf(policy2);
         }
 
         [Fact]
         public async Task GetAllPoliciesAsync_ShouldReturnEmptyList_WhenNoPoliciesExist()
         {
-            // Arrange
-            var emptyDbSetMock = CreateDbSetMock(new List<Policy>());
-            _dbContextMock.Setup(x => x.Policies).Returns(emptyDbSetMock.Object);
-
-            var repository = new PolicyRepository(_dbContextMock.Object, _loggerMock.Object);
-
             // Act
-            var result = await repository.GetAllPoliciesAsync();
+            var result = await _repository.GetAllPoliciesAsync();
 
             // Assert
             result.Should().BeEmpty();
         }
 
         [Fact]
-        public async Task GetAllPoliciesAsync_ShouldLogAndThrowRepositoryException_OnDbException()
+        public async Task GetAllPoliciesAsync_ShouldThrowDataAccessException_OnDbException()
         {
             // Arrange
-            _dbSetMock.As<IQueryable<Policy>>()
-                .Setup(m => m.Provider)
-                .Throws(new InvalidOperationException("DB error"));
+            _dbSetMock.Setup(d => d.ToListAsync(It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new Exception("DB error"));
 
             // Act
             Func<Task> act = async () => await _repository.GetAllPoliciesAsync();
 
             // Assert
-            var ex = await Assert.ThrowsAsync<RepositoryException>(act);
-            ex.Message.Should().Contain("Failed to retrieve policies");
+            await act.Should().ThrowAsync<DataAccessException>()
+                .WithMessage("Failed to retrieve policies*");
             _loggerMock.Verify(
-                l => l.LogError(It.IsAny<Exception>(), "Error retrieving all policies"),
-                Times.Once);
+                l => l.LogError(It.IsAny<Exception>(), It.IsAny<string>()), Times.Once);
         }
 
         [Fact]
         public async Task AddPolicyAsync_ShouldAddPolicyAndReturnEntity()
         {
             // Arrange
-            var newPolicy = CreatePolicy("POL000004");
-            _dbContextMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            var policy = CreateTestPolicy();
+
+            _dbContextMock.Setup(c => c.SaveChangesAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(1);
 
             // Act
-            var result = await _repository.AddPolicyAsync(newPolicy);
+            var result = await _repository.AddPolicyAsync(policy);
 
             // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEquivalentTo(newPolicy);
-            _policyData.Should().Contain(newPolicy);
-            _dbContextMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+            result.Should().BeEquivalentTo(policy);
+            _policyStore.Should().ContainEquivalentOf(policy);
         }
 
         [Fact]
-        public async Task AddPolicyAsync_ShouldLogAndThrowRepositoryException_OnDbException()
+        public async Task AddPolicyAsync_ShouldThrowDataAccessException_OnDbException()
         {
             // Arrange
-            var newPolicy = CreatePolicy("POL000005");
+            var policy = CreateTestPolicy();
             _dbSetMock.Setup(d => d.AddAsync(It.IsAny<Policy>(), It.IsAny<CancellationToken>()))
-                .ThrowsAsync(new InvalidOperationException("DB error"));
+                .ThrowsAsync(new Exception("DB error"));
 
             // Act
-            Func<Task> act = async () => await _repository.AddPolicyAsync(newPolicy);
+            Func<Task> act = async () => await _repository.AddPolicyAsync(policy);
 
             // Assert
-            var ex = await Assert.ThrowsAsync<RepositoryException>(act);
-            ex.Message.Should().Contain(newPolicy.PolicyNumber);
+            await act.Should().ThrowAsync<DataAccessException>()
+                .WithMessage($"Failed to add policy {policy.PolicyNumber}*");
             _loggerMock.Verify(
-                l => l.LogError(It.IsAny<Exception>(), It.IsAny<string>(), newPolicy.PolicyNumber),
-                Times.Once);
+                l => l.LogError(It.IsAny<Exception>(), It.IsAny<string>(), policy.PolicyNumber), Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdatePolicyAsync_ShouldUpdatePolicyAndReturnEntity()
+        {
+            // Arrange
+            var policy = CreateTestPolicy();
+            _policyStore.Add(policy);
+
+            _dbContextMock.Setup(c => c.SaveChangesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(1);
+
+            var updatedPolicy = policy with { PolicyHolderFirstName = "Jane" };
+
+            // Act
+            var result = await _repository.UpdatePolicyAsync(updatedPolicy);
+
+            // Assert
+            result.Should().BeEquivalentTo(updatedPolicy);
+            _policyStore.Should().ContainEquivalentOf(updatedPolicy);
+        }
+
+        [Fact]
+        public async Task UpdatePolicyAsync_ShouldThrowDataAccessException_OnDbException()
+        {
+            // Arrange
+            var policy = CreateTestPolicy();
+            _policyStore.Add(policy);
+
+            _dbContextMock.Setup(c => c.SaveChangesAsync(It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new Exception("DB error"));
+
+            // Act
+            Func<Task> act = async () => await _repository.UpdatePolicyAsync(policy);
+
+            // Assert
+            await act.Should().ThrowAsync<DataAccessException>()
+                .WithMessage($"Failed to update policy {policy.PolicyNumber}*");
+            _loggerMock.Verify(
+                l => l.LogError(It.IsAny<Exception>(), It.IsAny<string>(), policy.PolicyNumber), Times.Once);
+        }
+
+        [Fact]
+        public async Task DeletePolicyAsync_ShouldDeletePolicyAndReturnTrue_WhenPolicyExists()
+        {
+            // Arrange
+            var policy = CreateTestPolicy();
+            _policyStore.Add(policy);
+
+            _dbContextMock.Setup(c => c.SaveChangesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(1);
+
+            // Act
+            var result = await _repository.DeletePolicyAsync(policy.PolicyNumber);
+
+            // Assert
+            result.Should().BeTrue();
+            _policyStore.Should().NotContain(policy);
+        }
+
+        [Fact]
+        public async Task DeletePolicyAsync_ShouldReturnFalse_WhenPolicyDoesNotExist()
+        {
+            // Arrange
+            _dbContextMock.Setup(c => c.SaveChangesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(1);
+
+            // Act
+            var result = await _repository.DeletePolicyAsync("NONEXISTENT");
+
+            // Assert
+            result.Should().BeFalse();
+        }
+
+        [Fact]
+        public async Task DeletePolicyAsync_ShouldThrowDataAccessException_OnDbException()
+        {
+            // Arrange
+            var policy = CreateTestPolicy();
+            _policyStore.Add(policy);
+
+            _dbContextMock.Setup(c => c.SaveChangesAsync(It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new Exception("DB error"));
+
+            // Act
+            Func<Task> act = async () => await _repository.DeletePolicyAsync(policy.PolicyNumber);
+
+            // Assert
+            await act.Should().ThrowAsync<DataAccessException>()
+                .WithMessage($"Failed to delete policy {policy.PolicyNumber}*");
+            _loggerMock.Verify(
+                l => l.LogError(It.IsAny<Exception>(), It.IsAny<string>(), policy.PolicyNumber), Times.Once);
         }
 
         [Fact]
         public void Constructor_ShouldThrowArgumentNullException_WhenDbContextIsNull()
         {
-            // Arrange
-            InsuranceDbContext? nullDbContext = null;
-
             // Act
-            Action act = () => new PolicyRepository(nullDbContext!, _loggerMock.Object);
+            Action act = () => new PolicyRepository(null!, _loggerMock.Object);
 
             // Assert
-            act.Should().Throw<ArgumentNullException>().WithParameterName("dbContext");
+            act.Should().Throw<ArgumentNullException>()
+                .WithParameterName("dbContext");
         }
 
         [Fact]
         public void Constructor_ShouldThrowArgumentNullException_WhenLoggerIsNull()
         {
-            // Arrange
-            ILogger<PolicyRepository>? nullLogger = null;
-
             // Act
-            Action act = () => new PolicyRepository(_dbContextMock.Object, nullLogger!);
+            Action act = () => new PolicyRepository(_dbContextMock.Object, null!);
 
             // Assert
-            act.Should().Throw<ArgumentNullException>().WithParameterName("logger");
+            act.Should().Throw<ArgumentNullException>()
+                .WithParameterName("logger");
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData(null)]
+        [InlineData("          ")]
+        public async Task GetPolicyByNumberAsync_ShouldHandleNullOrEmptyPolicyNumber(string? policyNumber)
+        {
+            // Arrange
+            // PolicyNumber is required in COBOL; test that repository returns null for invalid input.
+            // (Assuming DB will not throw for empty, just return null.)
+
+            // Act
+            var result = await _repository.GetPolicyByNumberAsync(policyNumber!);
+
+            // Assert
+            result.Should().BeNull();
         }
 
         [Fact]
-        public async Task AddPolicyAsync_ShouldThrowArgumentNullException_WhenPolicyIsNull()
+        public async Task AddPolicyAsync_ShouldThrowDataAccessException_WhenPolicyIsNull()
         {
             // Arrange
-            Policy? nullPolicy = null;
+            // Simulate AddAsync throwing ArgumentNullException
+            _dbSetMock.Setup(d => d.AddAsync(null!, It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new ArgumentNullException());
 
             // Act
-            Func<Task> act = async () => await _repository.AddPolicyAsync(nullPolicy!);
+            Func<Task> act = async () => await _repository.AddPolicyAsync(null!);
 
             // Assert
-            await act.Should().ThrowAsync<ArgumentNullException>();
+            await act.Should().ThrowAsync<DataAccessException>();
         }
 
         [Fact]
-        public async Task AddPolicyAsync_ShouldThrowRepositoryException_WhenPolicyHasMissingRequiredFields()
+        public async Task UpdatePolicyAsync_ShouldThrowDataAccessException_WhenPolicyIsNull()
         {
             // Arrange
-            var invalidPolicy = new Policy
-            {
-                PolicyNumber = null!,
-                PolicyHolderFirstName = null!,
-                PolicyHolderMiddleName = null!,
-                PolicyHolderLastName = null!,
-                PolicyBeneficiaryName = null!,
-                PolicyBeneficiaryRelation = null!,
-                PolicyHolderAddress1 = null!,
-                PolicyHolderAddress2 = null!,
-                PolicyHolderCity = null!,
-                PolicyHolderState = null!,
-                PolicyHolderZipCode = null!,
-                PolicyHolderDateOfBirth = null!,
-                PolicyHolderGender = null!,
-                PolicyHolderPhone = null!,
-                PolicyHolderEmail = null!,
-                PolicyPaymentFrequency = null!,
-                PolicyPaymentMethod = null!,
-                PolicyUnderwriter = null!,
-                PolicyTermsAndConditions = null!,
-                PolicyClaimed = null!,
-                PolicyDiscountCode = null!,
-                PolicyPremiumAmount = 0,
-                PolicyCoverageAmount = 0,
-                PolicyType = null!,
-                PolicyStartDate = default,
-                PolicyExpiryDate = default,
-                PolicyStatus = null!,
-                PolicyAgentCode = null!,
-                PolicyNotifyFlag = null!,
-                PolicyAddTimestamp = default,
-                PolicyUpdateTimestamp = default
-            };
-
-            _dbSetMock.Setup(d => d.AddAsync(It.IsAny<Policy>(), It.IsAny<CancellationToken>()))
-                .ThrowsAsync(new DbUpdateException("Validation failed"));
+            // Simulate Update throwing ArgumentNullException
+            _dbSetMock.Setup(d => d.Update(null!)).Throws(new ArgumentNullException());
 
             // Act
-            Func<Task> act = async () => await _repository.AddPolicyAsync(invalidPolicy);
+            Func<Task> act = async () => await _repository.UpdatePolicyAsync(null!);
 
             // Assert
-            await act.Should().ThrowAsync<RepositoryException>()
-                .WithMessage($"Failed to add policy *");
+            await act.Should().ThrowAsync<DataAccessException>();
         }
 
         [Fact]
-        public async Task GetPolicyByNumberAsync_ShouldPreserveCobolBusinessLogic_PolicyNumberIsKey()
+        public async Task DeletePolicyAsync_ShouldThrowDataAccessException_WhenExceptionOccursDuringGet()
         {
             // Arrange
-            var policyNumber = "POL000002";
+            _dbSetMock.Setup(d => d.FindAsync(It.IsAny<object[]>()))
+                .ThrowsAsync(new Exception("DB error"));
 
             // Act
-            var result = await _repository.GetPolicyByNumberAsync(policyNumber);
+            Func<Task> act = async () => await _repository.DeletePolicyAsync("P123456789");
 
             // Assert
-            result.Should().NotBeNull();
-            result!.PolicyNumber.Should().Be(policyNumber);
+            await act.Should().ThrowAsync<DataAccessException>()
+                .WithMessage("Failed to delete policy P123456789*");
         }
 
-        [Fact]
-        public async Task AddPolicyAsync_ShouldPreserveCobolBusinessLogic_PolicyAddTimestampAndUpdateTimestampSet()
-        {
-            // Arrange
-            var newPolicy = CreatePolicy("POL000006");
-            newPolicy = newPolicy with
-            {
-                PolicyAddTimestamp = DateTimeOffset.MinValue,
-                PolicyUpdateTimestamp = DateTimeOffset.MinValue
-            };
-
-            _dbContextMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(1);
-
-            // Act
-            var result = await _repository.AddPolicyAsync(newPolicy);
-
-            // Assert
-            result.PolicyAddTimestamp.Should().Be(DateTimeOffset.MinValue);
-            result.PolicyUpdateTimestamp.Should().Be(DateTimeOffset.MinValue);
-        }
-
-        [Fact]
-        public async Task GetAllPoliciesAsync_ShouldPreserveCobolBusinessLogic_PoliciesOrderedByPolicyNumber()
-        {
-            // Arrange
-            var expectedOrder = _policyData.OrderBy(p => p.PolicyNumber).ToList();
-
-            // Act
-            var result = await _repository.GetAllPoliciesAsync();
-
-            // Assert
-            result.Should().BeInAscendingOrder(p => p.PolicyNumber);
-            result.Should().BeEquivalentTo(expectedOrder);
-        }
-
-        // Integration test for database operations using InMemory provider
+        // Integration test using in-memory EF Core database
         [Fact]
         public async Task Integration_AddAndRetrievePolicy_ShouldPersistAndReturnPolicy()
         {
@@ -399,118 +433,192 @@ namespace Insurance.Data.Models.Tests
             var options = new DbContextOptionsBuilder<InsuranceDbContext>()
                 .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
                 .Options;
-
             using var dbContext = new InsuranceDbContext(options);
             var logger = new Mock<ILogger<PolicyRepository>>();
-            var repository = new PolicyRepository(dbContext, logger.Object);
+            var repo = new PolicyRepository(dbContext, logger.Object);
 
-            var newPolicy = CreatePolicy("POLINT001");
+            var policy = CreateTestPolicy("INTEGRATION1");
 
             // Act
-            var addedPolicy = await repository.AddPolicyAsync(newPolicy);
-            var retrievedPolicy = await repository.GetPolicyByNumberAsync("POLINT001");
-            var allPolicies = await repository.GetAllPoliciesAsync();
+            var added = await repo.AddPolicyAsync(policy);
+            var retrieved = await repo.GetPolicyByNumberAsync(policy.PolicyNumber);
 
             // Assert
-            addedPolicy.Should().BeEquivalentTo(newPolicy);
-            retrievedPolicy.Should().NotBeNull();
-            retrievedPolicy!.PolicyNumber.Should().Be("POLINT001");
-            allPolicies.Should().ContainSingle(p => p.PolicyNumber == "POLINT001");
+            added.Should().BeEquivalentTo(policy);
+            retrieved.Should().BeEquivalentTo(policy);
         }
 
-        // Edge case: AddPolicyAsync with boundary values for string lengths
+        [Fact]
+        public async Task Integration_DeletePolicy_ShouldRemovePolicy()
+        {
+            // Arrange
+            var options = new DbContextOptionsBuilder<InsuranceDbContext>()
+                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+                .Options;
+            using var dbContext = new InsuranceDbContext(options);
+            var logger = new Mock<ILogger<PolicyRepository>>();
+            var repo = new PolicyRepository(dbContext, logger.Object);
+
+            var policy = CreateTestPolicy("INTEGRATION2");
+            await repo.AddPolicyAsync(policy);
+
+            // Act
+            var deleted = await repo.DeletePolicyAsync(policy.PolicyNumber);
+            var retrieved = await repo.GetPolicyByNumberAsync(policy.PolicyNumber);
+
+            // Assert
+            deleted.Should().BeTrue();
+            retrieved.Should().BeNull();
+        }
+
+        [Fact]
+        public async Task Integration_UpdatePolicy_ShouldPersistChanges()
+        {
+            // Arrange
+            var options = new DbContextOptionsBuilder<InsuranceDbContext>()
+                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+                .Options;
+            using var dbContext = new InsuranceDbContext(options);
+            var logger = new Mock<ILogger<PolicyRepository>>();
+            var repo = new PolicyRepository(dbContext, logger.Object);
+
+            var policy = CreateTestPolicy("INTEGRATION3");
+            await repo.AddPolicyAsync(policy);
+
+            var updatedPolicy = policy with { PolicyHolderFirstName = "UpdatedName" };
+
+            // Act
+            var result = await repo.UpdatePolicyAsync(updatedPolicy);
+            var retrieved = await repo.GetPolicyByNumberAsync(policy.PolicyNumber);
+
+            // Assert
+            result.PolicyHolderFirstName.Should().Be("UpdatedName");
+            retrieved.PolicyHolderFirstName.Should().Be("UpdatedName");
+        }
+
+        [Fact]
+        public async Task Integration_GetAllPolicies_ShouldReturnAll()
+        {
+            // Arrange
+            var options = new DbContextOptionsBuilder<InsuranceDbContext>()
+                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+                .Options;
+            using var dbContext = new InsuranceDbContext(options);
+            var logger = new Mock<ILogger<PolicyRepository>>();
+            var repo = new PolicyRepository(dbContext, logger.Object);
+
+            var p1 = CreateTestPolicy("INTEGRATION4A");
+            var p2 = CreateTestPolicy("INTEGRATION4B");
+            await repo.AddPolicyAsync(p1);
+            await repo.AddPolicyAsync(p2);
+
+            // Act
+            var all = await repo.GetAllPoliciesAsync();
+
+            // Assert
+            all.Should().HaveCount(2);
+            all.Should().ContainEquivalentOf(p1);
+            all.Should().ContainEquivalentOf(p2);
+        }
+
+        // Edge case: Policy with boundary values for string lengths
         [Fact]
         public async Task AddPolicyAsync_ShouldAcceptBoundaryStringLengths()
         {
             // Arrange
-            var boundaryPolicy = new Policy
+            var policy = new Policy
             {
-                PolicyNumber = new string('X', 10),
-                PolicyHolderFirstName = new string('A', 35),
-                PolicyHolderMiddleName = "Z",
-                PolicyHolderLastName = new string('B', 35),
-                PolicyBeneficiaryName = new string('C', 60),
-                PolicyBeneficiaryRelation = new string('D', 15),
-                PolicyHolderAddress1 = new string('E', 100),
-                PolicyHolderAddress2 = new string('F', 100),
-                PolicyHolderCity = new string('G', 30),
-                PolicyHolderState = "ST",
-                PolicyHolderZipCode = new string('H', 10),
-                PolicyHolderDateOfBirth = "2000-12-31",
+                PolicyNumber = new string('A', 10),
+                PolicyHolderFirstName = new string('B', 35),
+                PolicyHolderMiddleName = "C",
+                PolicyHolderLastName = new string('D', 35),
+                PolicyBeneficiaryName = new string('E', 60),
+                PolicyBeneficiaryRelation = new string('F', 15),
+                PolicyHolderAddress1 = new string('G', 100),
+                PolicyHolderAddress2 = new string('H', 100),
+                PolicyHolderCity = new string('I', 30),
+                PolicyHolderState = new string('J', 2),
+                PolicyHolderZipCode = new string('K', 10),
+                PolicyHolderDateOfBirth = new string('L', 10),
                 PolicyHolderGender = new string('M', 8),
-                PolicyHolderPhone = new string('1', 10),
-                PolicyHolderEmail = new string('e', 30),
-                PolicyPaymentFrequency = new string('F', 10),
-                PolicyPaymentMethod = new string('M', 8),
-                PolicyUnderwriter = new string('U', 50),
-                PolicyTermsAndConditions = new string('T', 200),
+                PolicyHolderPhone = new string('N', 10),
+                PolicyHolderEmail = new string('O', 30),
+                PolicyPaymentFrequency = new string('P', 10),
+                PolicyPaymentMethod = new string('Q', 8),
+                PolicyUnderwriter = new string('R', 50),
+                PolicyTermsAndConditions = new string('S', 200),
                 PolicyClaimed = "Y",
-                PolicyDiscountCode = new string('D', 10),
-                PolicyPremiumAmount = 99999.99m,
+                PolicyDiscountCode = new string('T', 10),
+                PolicyPremiumAmount = 9999999.99m,
                 PolicyCoverageAmount = 9999999999.99m,
-                PolicyType = new string('T', 50),
+                PolicyType = new string('U', 50),
                 PolicyStartDate = DateTime.Today,
                 PolicyExpiryDate = DateTime.Today.AddYears(1),
                 PolicyStatus = "A",
-                PolicyAgentCode = new string('A', 10),
+                PolicyAgentCode = new string('V', 10),
                 PolicyNotifyFlag = "N",
-                PolicyAddTimestamp = DateTimeOffset.UtcNow,
-                PolicyUpdateTimestamp = DateTimeOffset.UtcNow
+                PolicyAddTimestamp = DateTime.Now,
+                PolicyUpdateTimestamp = DateTime.Now
             };
 
-            _dbContextMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            _dbContextMock.Setup(c => c.SaveChangesAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(1);
 
             // Act
-            var result = await _repository.AddPolicyAsync(boundaryPolicy);
+            var result = await _repository.AddPolicyAsync(policy);
 
             // Assert
-            result.Should().NotBeNull();
-            result.PolicyNumber.Length.Should().Be(10);
-            result.PolicyHolderFirstName.Length.Should().Be(35);
-            result.PolicyHolderLastName.Length.Should().Be(35);
-            result.PolicyBeneficiaryName.Length.Should().Be(60);
-            result.PolicyBeneficiaryRelation.Length.Should().Be(15);
-            result.PolicyHolderAddress1.Length.Should().Be(100);
-            result.PolicyHolderAddress2.Length.Should().Be(100);
-            result.PolicyHolderCity.Length.Should().Be(30);
-            result.PolicyHolderState.Length.Should().Be(2);
-            result.PolicyHolderZipCode.Length.Should().Be(10);
-            result.PolicyHolderGender.Length.Should().Be(8);
-            result.PolicyHolderEmail.Length.Should().Be(30);
-            result.PolicyPaymentFrequency.Length.Should().Be(10);
-            result.PolicyPaymentMethod.Length.Should().Be(8);
-            result.PolicyUnderwriter.Length.Should().Be(50);
-            result.PolicyTermsAndConditions.Length.Should().Be(200);
-            result.PolicyDiscountCode.Length.Should().Be(10);
-            result.PolicyType.Length.Should().Be(50);
-            result.PolicyAgentCode.Length.Should().Be(10);
+            result.Should().BeEquivalentTo(policy);
         }
 
-        // Edge case: AddPolicyAsync with string fields exceeding max length (should fail in real DB, but not in mock)
+        // Edge case: Policy with minimum values
         [Fact]
-        public async Task AddPolicyAsync_ShouldAllowOverLengthStringsInMock_ButWouldFailInRealDb()
+        public async Task AddPolicyAsync_ShouldAcceptMinimumValues()
         {
             // Arrange
-            var overLengthPolicy = CreatePolicy("POL000007") with
+            var policy = new Policy
             {
-                PolicyHolderFirstName = new string('A', 36), // Exceeds max length
-                PolicyHolderLastName = new string('B', 36),  // Exceeds max length
-                PolicyBeneficiaryName = new string('C', 61), // Exceeds max length
-                PolicyHolderState = "ILL",                   // Exceeds max length
+                PolicyNumber = "1",
+                PolicyHolderFirstName = "A",
+                PolicyHolderMiddleName = "B",
+                PolicyHolderLastName = "C",
+                PolicyBeneficiaryName = "D",
+                PolicyBeneficiaryRelation = "E",
+                PolicyHolderAddress1 = "F",
+                PolicyHolderAddress2 = "G",
+                PolicyHolderCity = "H",
+                PolicyHolderState = "I",
+                PolicyHolderZipCode = "J",
+                PolicyHolderDateOfBirth = "K",
+                PolicyHolderGender = "L",
+                PolicyHolderPhone = "M",
+                PolicyHolderEmail = "N",
+                PolicyPaymentFrequency = "O",
+                PolicyPaymentMethod = "P",
+                PolicyUnderwriter = "Q",
+                PolicyTermsAndConditions = "R",
+                PolicyClaimed = "S",
+                PolicyDiscountCode = "T",
+                PolicyPremiumAmount = 0.01m,
+                PolicyCoverageAmount = 0.01m,
+                PolicyType = "U",
+                PolicyStartDate = DateTime.MinValue,
+                PolicyExpiryDate = DateTime.MinValue,
+                PolicyStatus = "V",
+                PolicyAgentCode = "W",
+                PolicyNotifyFlag = "X",
+                PolicyAddTimestamp = DateTime.MinValue,
+                PolicyUpdateTimestamp = DateTime.MinValue
             };
 
-            _dbContextMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            _dbContextMock.Setup(c => c.SaveChangesAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(1);
 
             // Act
-            var result = await _repository.AddPolicyAsync(overLengthPolicy);
+            var result = await _repository.AddPolicyAsync(policy);
 
             // Assert
-            result.PolicyHolderFirstName.Length.Should().Be(36);
-            result.PolicyHolderLastName.Length.Should().Be(36);
-            result.PolicyBeneficiaryName.Length.Should().Be(61);
-            result.PolicyHolderState.Length.Should().Be(3);
+            result.Should().BeEquivalentTo(policy);
         }
     }
 }

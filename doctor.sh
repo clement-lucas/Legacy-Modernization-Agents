@@ -367,8 +367,8 @@ run_test() {
     # Check Semantic Kernel dependencies
     echo ""
     echo "Checking Semantic Kernel dependencies..."
-    if dotnet list "$PROJECT_DIR/CobolModernization.csproj" package 2>/dev/null | grep -q "Microsoft.SemanticKernel"; then
-        sk_version=$(dotnet list "$PROJECT_DIR/CobolModernization.csproj" package | grep "Microsoft.SemanticKernel" | awk '{print $3}' | head -1)
+    if dotnet list "$PROJECT_DIR/CobolToQuarkusMigration.csproj" package 2>/dev/null | grep -q "Microsoft.SemanticKernel"; then
+        sk_version=$(dotnet list "$PROJECT_DIR/CobolToQuarkusMigration.csproj" package | grep "Microsoft.SemanticKernel" | awk '{print $3}' | head -1)
         echo -e "${GREEN}✅ Semantic Kernel dependencies resolved (version: $sk_version)${NC}"
     else
         echo -e "${YELLOW}⚠️  Semantic Kernel packages not found, checking project file...${NC}"
@@ -378,11 +378,11 @@ run_test() {
     echo ""
     echo "Building project and restoring packages..."
     echo "="
-    if timeout 30s dotnet build "$PROJECT_DIR/CobolModernization.csproj" --no-restore --verbosity quiet 2>/dev/null || dotnet build "$PROJECT_DIR/CobolModernization.csproj" --verbosity minimal; then
+    if timeout 30s dotnet build "$PROJECT_DIR/CobolToQuarkusMigration.csproj" --no-restore --verbosity quiet 2>/dev/null || dotnet build "$PROJECT_DIR/CobolToQuarkusMigration.csproj" --verbosity minimal; then
         echo -e "${GREEN}✅ Project builds successfully${NC}"
     else
         echo -e "${RED}❌ Project build failed${NC}"
-        echo "Try running: dotnet restore $PROJECT_DIR/CobolModernization.csproj"
+        echo "Try running: dotnet restore $PROJECT_DIR/CobolToQuarkusMigration.csproj"
         return 1
     fi
 
@@ -527,7 +527,7 @@ run_migration() {
             echo -e "${BLUE}🚀 Starting COBOL to Java Quarkus Migration...${NC}"
             echo "=============================================="
             echo
-            dotnet run --project "$PROJECT_DIR/CobolModernization.csproj" -- \
+            dotnet run --project "$PROJECT_DIR/CobolToQuarkusMigration.csproj" -- \
                 --cobol-source ./cobol-source \
                 --java-output ./java-output \
                 --target Java
@@ -536,7 +536,7 @@ run_migration() {
             echo -e "${BLUE}🚀 Starting COBOL to C# .NET Migration...${NC}"
             echo "=========================================="
             echo
-            dotnet run --project "$PROJECT_DIR/CobolModernization.csproj" -- \
+            dotnet run --project "$PROJECT_DIR/CobolToQuarkusMigration.csproj" -- \
                 --cobol-source ./cobol-source \
                 --csharp-output ./csharp-output \
                 --target CSharp
@@ -547,7 +547,7 @@ run_migration() {
             echo
             echo -e "${YELLOW}⚠️  Note: This will take approximately 2x the time and API costs${NC}"
             echo
-            dotnet run --project "$PROJECT_DIR/CobolModernization.csproj" -- \
+            dotnet run --project "$PROJECT_DIR/CobolToQuarkusMigration.csproj" -- \
                 --cobol-source ./cobol-source \
                 --java-output ./java-output \
                 --csharp-output ./csharp-output \
@@ -606,7 +606,7 @@ run_resume() {
     fi
 
     # Run with resume logic
-    dotnet run --project "$PROJECT_DIR/CobolModernization.csproj" -- --cobol-source ./cobol-source --java-output ./java-output --resume
+    dotnet run --project "$PROJECT_DIR/CobolToQuarkusMigration.csproj" -- --cobol-source ./cobol-source --java-output ./java-output --resume
 }
 
 # Function to monitor migration
@@ -641,7 +641,7 @@ run_chat_test() {
     echo "Testing chat logging system..."
     
     # Run a simple test
-    dotnet run --project "$PROJECT_DIR/CobolModernization.csproj" -- --test-chat-logging
+    dotnet run --project "$PROJECT_DIR/CobolToQuarkusMigration.csproj" -- --test-chat-logging
 }
 
 # Function to validate system
@@ -664,7 +664,7 @@ run_validate() {
         "Config/ai-config.env"
         "Config/load-config.sh"
         "Config/appsettings.json"
-        "CobolModernization.csproj"
+        "CobolToQuarkusMigration.csproj"
         "Program.cs"
     )
 
@@ -777,7 +777,7 @@ run_code_validation() {
             echo -e "${BLUE}🔍 Validating Java Conversion...${NC}"
             echo "================================="
             echo
-            dotnet run --project "$PROJECT_DIR/CobolModernization.csproj" -- \
+            dotnet run --project "$PROJECT_DIR/CobolToQuarkusMigration.csproj" -- \
                 --validate \
                 --cobol-source ./cobol-source \
                 --java-output ./java-output \
@@ -794,7 +794,7 @@ run_code_validation() {
             echo -e "${BLUE}🔍 Validating C# Conversion...${NC}"
             echo "==============================="
             echo
-            dotnet run --project "$PROJECT_DIR/CobolModernization.csproj" -- \
+            dotnet run --project "$PROJECT_DIR/CobolToQuarkusMigration.csproj" -- \
                 --validate \
                 --cobol-source ./cobol-source \
                 --csharp-output ./csharp-output \
@@ -811,7 +811,7 @@ run_code_validation() {
             # Validate Java if output exists
             if [ -d "$SCRIPT_DIR/java-output" ] && [ -n "$(ls -A $SCRIPT_DIR/java-output 2>/dev/null)" ]; then
                 echo -e "${CYAN}Validating Java Conversion...${NC}"
-                dotnet run --project "$PROJECT_DIR/CobolModernization.csproj" -- \
+                dotnet run --project "$PROJECT_DIR/CobolToQuarkusMigration.csproj" -- \
                     --validate \
                     --cobol-source ./cobol-source \
                     --java-output ./java-output \
@@ -824,7 +824,7 @@ run_code_validation() {
             # Validate C# if output exists
             if [ -d "$SCRIPT_DIR/csharp-output" ] && [ -n "$(ls -A $SCRIPT_DIR/csharp-output 2>/dev/null)" ]; then
                 echo -e "${CYAN}Validating C# Conversion...${NC}"
-                dotnet run --project "$PROJECT_DIR/CobolModernization.csproj" -- \
+                dotnet run --project "$PROJECT_DIR/CobolToQuarkusMigration.csproj" -- \
                     --validate \
                     --cobol-source ./cobol-source \
                     --csharp-output ./csharp-output \
@@ -1006,7 +1006,7 @@ run_conversation() {
     echo "Type 'exit' to quit"
     echo ""
 
-    dotnet run --project "$PROJECT_DIR/CobolModernization.csproj" -- --interactive
+    dotnet run --project "$PROJECT_DIR/CobolToQuarkusMigration.csproj" -- --interactive
 }
 
 # Main command routing

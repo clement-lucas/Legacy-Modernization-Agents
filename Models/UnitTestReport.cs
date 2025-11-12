@@ -1,4 +1,4 @@
-namespace CobolModernization.Models;
+namespace CobolToQuarkusMigration.Models;
 
 /// <summary>
 /// Represents a report summarizing generated unit tests

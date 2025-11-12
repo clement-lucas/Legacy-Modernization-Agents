@@ -4,14 +4,14 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using CobolModernization.Agents.Interfaces;
-using CobolModernization.Helpers;
-using CobolModernization.Models;
+using CobolToQuarkusMigration.Agents.Interfaces;
+using CobolToQuarkusMigration.Helpers;
+using CobolToQuarkusMigration.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 
-namespace CobolModernization.Agents
+namespace CobolToQuarkusMigration.Agents
 {
     /// <summary>
     /// AI-powered validation agent that compares converted code with original COBOL

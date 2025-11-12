@@ -17,7 +17,7 @@ namespace Insurance.Tracking
     );
 
     /// <summary>
-    /// Represents the output/result of the tracking operation.
+    /// Represents the output result of the tracking operation.
     /// </summary>
     public record TrackingOperationResult(
         int SqlCode
@@ -35,12 +35,12 @@ namespace Insurance.Tracking
     );
 
     /// <summary>
-    /// Interface for tracking repository abstraction.
+    /// Interface for tracking repository to abstract database operations.
     /// </summary>
     public interface ITrackingRepository
     {
         /// <summary>
-        /// Attempts to retrieve a tracking record by policy number.
+        /// Retrieves a tracking record by policy number.
         /// </summary>
         /// <param name="policyNumber">The policy number to search for.</param>
         /// <returns>The tracking record if found; otherwise, null.</returns>
@@ -50,37 +50,29 @@ namespace Insurance.Tracking
         /// Inserts a new tracking record.
         /// </summary>
         /// <param name="record">The tracking record to insert.</param>
-        /// <returns>The SQLCODE from the operation.</returns>
+        /// <returns>The SQL code resulting from the operation.</returns>
         Task<int> InsertTrackingRecordAsync(TrackingRecord record);
 
         /// <summary>
         /// Updates an existing tracking record.
         /// </summary>
         /// <param name="record">The tracking record to update.</param>
-        /// <returns>The SQLCODE from the operation.</returns>
+        /// <returns>The SQL code resulting from the operation.</returns>
         Task<int> UpdateTrackingRecordAsync(TrackingRecord record);
     }
 
     /// <summary>
-    /// Concrete implementation of <see cref="ITrackingRepository"/> using ADO.NET.
+    /// Implementation of <see cref="ITrackingRepository"/> using ADO.NET.
     /// </summary>
     public class TrackingRepository : ITrackingRepository
     {
         private readonly DbConnection _connection;
-        private readonly ILogger<TrackingRepository> _logger;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="TrackingRepository"/> class.
-        /// </summary>
-        /// <param name="connection">The database connection.</param>
-        /// <param name="logger">The logger instance.</param>
-        public TrackingRepository(DbConnection connection, ILogger<TrackingRepository> logger)
+        public TrackingRepository(DbConnection connection)
         {
             _connection = connection ?? throw new ArgumentNullException(nameof(connection));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        /// <inheritdoc/>
         public async Task<TrackingRecord?> GetTrackingRecordAsync(string policyNumber)
         {
             const string sql = @"
@@ -98,36 +90,22 @@ namespace Insurance.Tracking
             param.Value = policyNumber;
             cmd.Parameters.Add(param);
 
-            try
-            {
-                if (_connection.State != ConnectionState.Open)
-                    await _connection.OpenAsync();
+            await _connection.OpenAsync();
 
-                await using var reader = await cmd.ExecuteReaderAsync();
-                if (await reader.ReadAsync())
-                {
-                    return new TrackingRecord(
-                        reader.GetString(0),
-                        reader.GetString(1),
-                        reader.GetString(2),
-                        reader.GetDateTime(3),
-                        reader.GetDateTime(4)
-                    );
-                }
-                else
-                {
-                    // SQLCODE 100: Not found
-                    return null;
-                }
-            }
-            catch (DbException ex)
+            await using var reader = await cmd.ExecuteReaderAsync();
+            if (await reader.ReadAsync())
             {
-                _logger.LogError(ex, "Error selecting TTRACKING for PolicyNumber: {PolicyNumber}", policyNumber);
-                throw new DataException("Error selecting TTRACKING record.", ex);
+                return new TrackingRecord(
+                    reader.GetString(0),
+                    reader.GetString(1),
+                    reader.GetString(2),
+                    reader.GetDateTime(3),
+                    reader.GetDateTime(4)
+                );
             }
+            return null;
         }
 
-        /// <inheritdoc/>
         public async Task<int> InsertTrackingRecordAsync(TrackingRecord record)
         {
             const string sql = @"
@@ -156,21 +134,17 @@ namespace Insurance.Tracking
 
             try
             {
-                if (_connection.State != ConnectionState.Open)
-                    await _connection.OpenAsync();
-
+                await _connection.OpenAsync();
                 var affected = await cmd.ExecuteNonQueryAsync();
-                // SQLCODE 0: Success, else error
-                return affected > 0 ? 0 : -1;
+                return affected == 1 ? 0 : -1; // 0 for success, -1 for failure
             }
             catch (DbException ex)
             {
-                _logger.LogError(ex, "Error inserting into TTRACKING for PolicyNumber: {PolicyNumber}", record.PolicyNumber);
-                return ex.ErrorCode != 0 ? ex.ErrorCode : -1;
+                // Log or handle exception as needed
+                return ex.ErrorCode;
             }
         }
 
-        /// <inheritdoc/>
         public async Task<int> UpdateTrackingRecordAsync(TrackingRecord record)
         {
             const string sql = @"
@@ -192,16 +166,14 @@ namespace Insurance.Tracking
 
             try
             {
-                if (_connection.State != ConnectionState.Open)
-                    await _connection.OpenAsync();
-
+                await _connection.OpenAsync();
                 var affected = await cmd.ExecuteNonQueryAsync();
-                return affected > 0 ? 0 : -1;
+                return affected == 1 ? 0 : -1; // 0 for success, -1 for failure
             }
             catch (DbException ex)
             {
-                _logger.LogError(ex, "Error updating TTRACKING for PolicyNumber: {PolicyNumber}", record.PolicyNumber);
-                return ex.ErrorCode != 0 ? ex.ErrorCode : -1;
+                // Log or handle exception as needed
+                return ex.ErrorCode;
             }
         }
 
@@ -216,30 +188,31 @@ namespace Insurance.Tracking
     }
 
     /// <summary>
-    /// Service responsible for processing tracking operations (insert/update).
+    /// Service class that implements the main logic for inserting or updating insurance tracking records.
     /// </summary>
-    public class TrackingService
+    public class TrackingDriverService
     {
         private readonly ITrackingRepository _repository;
-        private readonly ILogger<TrackingService> _logger;
+        private readonly ILogger<TrackingDriverService> _logger;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="TrackingService"/> class.
+        /// Initializes a new instance of the <see cref="TrackingDriverService"/> class.
         /// </summary>
         /// <param name="repository">The tracking repository.</param>
         /// <param name="logger">The logger instance.</param>
-        public TrackingService(ITrackingRepository repository, ILogger<TrackingService> logger)
+        public TrackingDriverService(ITrackingRepository repository, ILogger<TrackingDriverService> logger)
         {
             _repository = repository ?? throw new ArgumentNullException(nameof(repository));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         /// <summary>
-        /// Processes the tracking operation based on the input parameters.
+        /// Executes the tracking operation (insert or update) based on the input parameters.
         /// </summary>
         /// <param name="input">The input parameters for the operation.</param>
-        /// <returns>The result of the operation, including the SQLCODE.</returns>
-        public async Task<TrackingOperationResult> ProcessTrackingOperationAsync(TrackingOperationInput input)
+        /// <returns>The result containing the SQL code.</returns>
+        /// <exception cref="ArgumentException">Thrown when the operation type is invalid.</exception>
+        public async Task<TrackingOperationResult> ExecuteAsync(TrackingOperationInput input)
         {
             if (input is null)
                 throw new ArgumentNullException(nameof(input));
@@ -248,95 +221,60 @@ namespace Insurance.Tracking
 
             try
             {
-                // Normalize operation type
+                // Validate operation type
                 var operationType = input.OperationType?.Trim().ToUpperInvariant();
-
-                switch (operationType)
+                if (operationType != "INSERT" && operationType != "UPDATE")
                 {
-                    case "INSERT":
-                    case "UPDATE":
-                        sqlCode = await InsertOrUpdateTrackingAsync(input, operationType);
-                        break;
-
-                    default:
-                        _logger.LogWarning("Invalid operation type: {OperationType}", input.OperationType);
-                        sqlCode = -1;
-                        break;
+                    _logger.LogError("Invalid operation type: {OperationType}", input.OperationType);
+                    sqlCode = -1;
+                    return new TrackingOperationResult(sqlCode);
                 }
+
+                // Select tracking record
+                var trackingRecord = await _repository.GetTrackingRecordAsync(input.PolicyNumber);
+
+                // Populate tracking record for insert/update
+                var recordToPersist = new TrackingRecord(
+                    PolicyNumber: input.PolicyNumber,
+                    NotifyDate: input.ProcessDate,
+                    Status: "A",
+                    AddTimestamp: DateTime.UtcNow,
+                    UpdateTimestamp: DateTime.UtcNow
+                );
+
+                if (trackingRecord is null)
+                {
+                    // Not present in tracking: perform insert
+                    sqlCode = await _repository.InsertTrackingRecordAsync(recordToPersist);
+                    if (sqlCode != 0)
+                    {
+                        _logger.LogError("Error inserting into TTRAKING. SQLCODE: {SqlCode}", sqlCode);
+                        // Optionally, throw or handle as needed
+                    }
+                }
+                else
+                {
+                    // Present in tracking: perform update
+                    sqlCode = await _repository.UpdateTrackingRecordAsync(recordToPersist);
+                    if (sqlCode != 0)
+                    {
+                        _logger.LogError("Error updating TTRAKING. SQLCODE: {SqlCode}", sqlCode);
+                        // Optionally, throw or handle as needed
+                    }
+                }
+            }
+            catch (DbException dbEx)
+            {
+                _logger.LogError(dbEx, "Database error occurred during tracking operation.");
+                sqlCode = dbEx.ErrorCode;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unhandled exception in ProcessTrackingOperationAsync");
-                sqlCode = -99999; // Arbitrary error code for unhandled exceptions
+                _logger.LogError(ex, "Unexpected error occurred during tracking operation.");
+                sqlCode = -99999; // Arbitrary error code for unexpected errors
             }
 
             return new TrackingOperationResult(sqlCode);
-        }
-
-        /// <summary>
-        /// Handles the logic for inserting or updating a tracking record.
-        /// </summary>
-        /// <param name="input">The input parameters.</param>
-        /// <param name="operationType">The normalized operation type.</param>
-        /// <returns>The SQLCODE from the operation.</returns>
-        private async Task<int> InsertOrUpdateTrackingAsync(TrackingOperationInput input, string operationType)
-        {
-            // Step 1: Check if record exists
-            var existingRecord = await _repository.GetTrackingRecordAsync(input.PolicyNumber);
-
-            // Step 2: Populate tracking record fields
-            var trackingRecord = new TrackingRecord(
-                PolicyNumber: input.PolicyNumber,
-                NotifyDate: input.ProcessDate,
-                Status: "A",
-                AddTimestamp: DateTime.UtcNow, // Will be set by DB
-                UpdateTimestamp: DateTime.UtcNow // Will be set by DB
-            );
-
-            // Step 3: Insert or Update
-            if (existingRecord is null)
-            {
-                // Not present in tracking: INSERT
-                var insertCode = await _repository.InsertTrackingRecordAsync(trackingRecord);
-                if (insertCode != 0)
-                {
-                    _logger.LogError("Error inserting into TTRACKING. SQLCODE: {SqlCode}", insertCode);
-                }
-                return insertCode;
-            }
-            else
-            {
-                // Present in tracking: UPDATE
-                var updateCode = await _repository.UpdateTrackingRecordAsync(trackingRecord);
-                if (updateCode != 0)
-                {
-                    _logger.LogError("Error updating TTRACKING. SQLCODE: {SqlCode}", updateCode);
-                }
-                return updateCode;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Example of how to wire up the service and repository using dependency injection.
-    /// </summary>
-    public static class ServiceRegistration
-    {
-        /// <summary>
-        /// Registers tracking services and repository in the DI container.
-        /// </summary>
-        /// <param name="services">The service collection.</param>
-        /// <param name="connectionFactory">A factory for creating DbConnection instances.</param>
-        public static void AddTrackingServices(this IServiceCollection services, Func<IServiceProvider, DbConnection> connectionFactory)
-        {
-            services.AddScoped<ITrackingRepository>(provider =>
-            {
-                var connection = connectionFactory(provider);
-                var logger = provider.GetRequiredService<ILogger<TrackingRepository>>();
-                return new TrackingRepository(connection, logger);
-            });
-
-            services.AddScoped<TrackingService>();
         }
     }
 }

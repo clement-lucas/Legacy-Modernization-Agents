@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
-namespace CobolModernization.Helpers;
+namespace CobolToQuarkusMigration.Helpers;
 
 /// <summary>
 /// Helper class for application settings.

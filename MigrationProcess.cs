@@ -1,12 +1,12 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
-using CobolModernization.Agents;
-using CobolModernization.Agents.Interfaces;
-using CobolModernization.Helpers;
-using CobolModernization.Models;
+using CobolToQuarkusMigration.Agents;
+using CobolToQuarkusMigration.Agents.Interfaces;
+using CobolToQuarkusMigration.Helpers;
+using CobolToQuarkusMigration.Models;
 using System.Text;
 
-namespace CobolModernization;
+namespace CobolToQuarkusMigration;
 
 /// <summary>
 /// Main class for the COBOL to Java Quarkus migration process.

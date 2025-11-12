@@ -1,7 +1,8 @@
 using System;
+using System.Text.Json.Serialization;
 using System.Collections.Generic;
 
-namespace CobolModernization.Models
+namespace CobolToQuarkusMigration.Models
 {
     /// <summary>
     /// Represents a validation report comparing converted code with original COBOL

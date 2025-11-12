@@ -1,4 +1,4 @@
-namespace CobolModernization.Models;
+namespace CobolToQuarkusMigration.Models;
 
 /// <summary>
 /// Represents a dependency relationship between COBOL files.

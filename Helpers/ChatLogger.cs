@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging;
 using System.Text;
 using System.Text.Json;
 
-namespace CobolModernization.Helpers;
+namespace CobolToQuarkusMigration.Helpers;
 
 /// <summary>
 /// Logger for capturing full-length conversations between agents and Azure OpenAI

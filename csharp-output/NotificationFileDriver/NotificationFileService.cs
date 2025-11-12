@@ -1,8 +1,8 @@
 using System;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace NotificationFileDriver
 {
@@ -22,7 +22,7 @@ namespace NotificationFileDriver
     public record FileOperationResult(string StatusCode, string? ErrorMessage = null);
 
     /// <summary>
-    /// Represents a notification record for an agent.
+    /// Represents an agent notification record.
     /// </summary>
     public record AgentNotifyRecord(
         string AgentCode,
@@ -42,7 +42,7 @@ namespace NotificationFileDriver
     );
 
     /// <summary>
-    /// Represents a notification record for a customer.
+    /// Represents a customer notification record.
     /// </summary>
     public record CustomerNotifyRecord(
         string CustPolicyNumber,
@@ -59,22 +59,22 @@ namespace NotificationFileDriver
     );
 
     /// <summary>
-    /// Represents a report record.
+    /// Represents a notification report record.
     /// </summary>
     public record NotifyReportRecord(
         string ReportLine
     );
 
     /// <summary>
-    /// Interface for file operations abstraction.
+    /// Provides file operations for notification files.
     /// </summary>
     public interface INotificationFileService
     {
-        Task<FileOperationResult> OpenAsync(string fileName);
-        Task<FileOperationResult> CloseAsync(string fileName);
-        Task<FileOperationResult> WriteAgentAsync(string fileName, AgentNotifyRecord record);
-        Task<FileOperationResult> WriteCustomerAsync(string fileName, CustomerNotifyRecord record);
-        Task<FileOperationResult> WriteReportAsync(string fileName, NotifyReportRecord record);
+        Task<FileOperationResult> OpenFileAsync(string fileName);
+        Task<FileOperationResult> CloseFileAsync(string fileName);
+        Task<FileOperationResult> WriteAgentRecordAsync(string fileName, AgentNotifyRecord record);
+        Task<FileOperationResult> WriteCustomerRecordAsync(string fileName, CustomerNotifyRecord record);
+        Task<FileOperationResult> WriteReportRecordAsync(string fileName, NotifyReportRecord record);
     }
 
     /// <summary>
@@ -83,42 +83,39 @@ namespace NotificationFileDriver
     public class NotificationFileService : INotificationFileService
     {
         private readonly ILogger<NotificationFileService> _logger;
-        private readonly object _fileLock = new();
 
-        // File streams for each file type
+        // File streams are kept open between Open/Close calls.
         private FileStream? _agentFileStream;
         private FileStream? _customerFileStream;
         private FileStream? _reportFileStream;
 
-        /// <summary>
-        /// Initializes a new instance of <see cref="NotificationFileService"/>.
-        /// </summary>
+        private const string AgentFilePhysicalName = "AGENTFLE";
+        private const string CustomerFilePhysicalName = "CUSTFLE";
+        private const string ReportFilePhysicalName = "RPTFLE";
+
         public NotificationFileService(ILogger<NotificationFileService> logger)
         {
             _logger = logger;
         }
 
-        /// <inheritdoc/>
-        public async Task<FileOperationResult> OpenAsync(string fileName)
+        /// <inheritdoc />
+        public async Task<FileOperationResult> OpenFileAsync(string fileName)
         {
             try
             {
-                lock (_fileLock)
+                switch (fileName)
                 {
-                    switch (fileName)
-                    {
-                        case "AGENT-NOTIFY-FILE":
-                            _agentFileStream = new FileStream("AGENTFLE", FileMode.Append, FileAccess.Write, FileShare.None);
-                            break;
-                        case "CUSTOMER-NOTIFY-FILE":
-                            _customerFileStream = new FileStream("CUSTFLE", FileMode.Append, FileAccess.Write, FileShare.None);
-                            break;
-                        case "NOTIFY-REPORT-FILE":
-                            _reportFileStream = new FileStream("RPTFLE", FileMode.Append, FileAccess.Write, FileShare.None);
-                            break;
-                        default:
-                            return new FileOperationResult("99", $"Unknown file name: {fileName}");
-                    }
+                    case "AGENT-NOTIFY-FILE":
+                        _agentFileStream = new FileStream(AgentFilePhysicalName, FileMode.Create, FileAccess.Write, FileShare.None);
+                        break;
+                    case "CUSTOMER-NOTIFY-FILE":
+                        _customerFileStream = new FileStream(CustomerFilePhysicalName, FileMode.Create, FileAccess.Write, FileShare.None);
+                        break;
+                    case "NOTIFY-REPORT-FILE":
+                        _reportFileStream = new FileStream(ReportFilePhysicalName, FileMode.Create, FileAccess.Write, FileShare.None);
+                        break;
+                    default:
+                        return new FileOperationResult("99", $"Unknown file name: {fileName}");
                 }
                 return new FileOperationResult("00");
             }
@@ -129,30 +126,27 @@ namespace NotificationFileDriver
             }
         }
 
-        /// <inheritdoc/>
-        public async Task<FileOperationResult> CloseAsync(string fileName)
+        /// <inheritdoc />
+        public async Task<FileOperationResult> CloseFileAsync(string fileName)
         {
             try
             {
-                lock (_fileLock)
+                switch (fileName)
                 {
-                    switch (fileName)
-                    {
-                        case "AGENT-NOTIFY-FILE":
-                            _agentFileStream?.Dispose();
-                            _agentFileStream = null;
-                            break;
-                        case "CUSTOMER-NOTIFY-FILE":
-                            _customerFileStream?.Dispose();
-                            _customerFileStream = null;
-                            break;
-                        case "NOTIFY-REPORT-FILE":
-                            _reportFileStream?.Dispose();
-                            _reportFileStream = null;
-                            break;
-                        default:
-                            return new FileOperationResult("99", $"Unknown file name: {fileName}");
-                    }
+                    case "AGENT-NOTIFY-FILE":
+                        _agentFileStream?.Dispose();
+                        _agentFileStream = null;
+                        break;
+                    case "CUSTOMER-NOTIFY-FILE":
+                        _customerFileStream?.Dispose();
+                        _customerFileStream = null;
+                        break;
+                    case "NOTIFY-REPORT-FILE":
+                        _reportFileStream?.Dispose();
+                        _reportFileStream = null;
+                        break;
+                    default:
+                        return new FileOperationResult("99", $"Unknown file name: {fileName}");
                 }
                 return new FileOperationResult("00");
             }
@@ -163,37 +157,18 @@ namespace NotificationFileDriver
             }
         }
 
-        /// <inheritdoc/>
-        public async Task<FileOperationResult> WriteAgentAsync(string fileName, AgentNotifyRecord record)
+        /// <inheritdoc />
+        public async Task<FileOperationResult> WriteAgentRecordAsync(string fileName, AgentNotifyRecord record)
         {
             try
             {
-                lock (_fileLock)
-                {
-                    if (_agentFileStream == null)
-                        return new FileOperationResult("98", "Agent file not open.");
+                if (_agentFileStream == null)
+                    return new FileOperationResult("99", "Agent file not open.");
 
-                    var line = string.Concat(
-                        record.AgentCode.PadRight(10),
-                        record.AgentName.PadRight(45),
-                        record.AgentAddress1.PadRight(50),
-                        record.AgentAddress2.PadRight(50),
-                        record.AgentCity.PadRight(20),
-                        record.AgentState.PadRight(2),
-                        record.AgentPolicyNumber.PadRight(10),
-                        record.AgentPolicyFName.PadRight(35),
-                        record.AgentPolicyMName.PadRight(1),
-                        record.AgentPolicyLName.PadRight(35),
-                        record.AgentPolicyStartDate.PadRight(10),
-                        record.AgentPolicyExpiryDate.PadRight(10),
-                        record.AgentNotifyDate.PadRight(10),
-                        record.AgentNotifyMessages.PadRight(100)
-                    );
-
-                    var bytes = System.Text.Encoding.UTF8.GetBytes(line + Environment.NewLine);
-                    _agentFileStream.Write(bytes, 0, bytes.Length);
-                    _agentFileStream.Flush();
-                }
+                var line = FormatAgentRecord(record);
+                var bytes = Encoding.UTF8.GetBytes(line + Environment.NewLine);
+                await _agentFileStream.WriteAsync(bytes, 0, bytes.Length);
+                await _agentFileStream.FlushAsync();
                 return new FileOperationResult("00");
             }
             catch (Exception ex)
@@ -203,34 +178,18 @@ namespace NotificationFileDriver
             }
         }
 
-        /// <inheritdoc/>
-        public async Task<FileOperationResult> WriteCustomerAsync(string fileName, CustomerNotifyRecord record)
+        /// <inheritdoc />
+        public async Task<FileOperationResult> WriteCustomerRecordAsync(string fileName, CustomerNotifyRecord record)
         {
             try
             {
-                lock (_fileLock)
-                {
-                    if (_customerFileStream == null)
-                        return new FileOperationResult("98", "Customer file not open.");
+                if (_customerFileStream == null)
+                    return new FileOperationResult("99", "Customer file not open.");
 
-                    var line = string.Concat(
-                        record.CustPolicyNumber.PadRight(10),
-                        record.CustFName.PadRight(35),
-                        record.CustMName.PadRight(1),
-                        record.CustLName.PadRight(35),
-                        record.CustPolicyStartDate.PadRight(10),
-                        record.CustPolicyExpiryDate.PadRight(10),
-                        record.CustNotifyDate.PadRight(10),
-                        record.CustNotifyMessages.PadRight(100),
-                        record.CustAgentCode.PadRight(10),
-                        record.CustAgentName.PadRight(45),
-                        record.CustStatutoryMessage.PadRight(100)
-                    );
-
-                    var bytes = System.Text.Encoding.UTF8.GetBytes(line + Environment.NewLine);
-                    _customerFileStream.Write(bytes, 0, bytes.Length);
-                    _customerFileStream.Flush();
-                }
+                var line = FormatCustomerRecord(record);
+                var bytes = Encoding.UTF8.GetBytes(line + Environment.NewLine);
+                await _customerFileStream.WriteAsync(bytes, 0, bytes.Length);
+                await _customerFileStream.FlushAsync();
                 return new FileOperationResult("00");
             }
             catch (Exception ex)
@@ -240,21 +199,18 @@ namespace NotificationFileDriver
             }
         }
 
-        /// <inheritdoc/>
-        public async Task<FileOperationResult> WriteReportAsync(string fileName, NotifyReportRecord record)
+        /// <inheritdoc />
+        public async Task<FileOperationResult> WriteReportRecordAsync(string fileName, NotifyReportRecord record)
         {
             try
             {
-                lock (_fileLock)
-                {
-                    if (_reportFileStream == null)
-                        return new FileOperationResult("98", "Report file not open.");
+                if (_reportFileStream == null)
+                    return new FileOperationResult("99", "Report file not open.");
 
-                    var line = record.ReportLine.PadRight(133);
-                    var bytes = System.Text.Encoding.UTF8.GetBytes(line + Environment.NewLine);
-                    _reportFileStream.Write(bytes, 0, bytes.Length);
-                    _reportFileStream.Flush();
-                }
+                var line = record.ReportLine;
+                var bytes = Encoding.UTF8.GetBytes(line + Environment.NewLine);
+                await _reportFileStream.WriteAsync(bytes, 0, bytes.Length);
+                await _reportFileStream.FlushAsync();
                 return new FileOperationResult("00");
             }
             catch (Exception ex)
@@ -263,10 +219,54 @@ namespace NotificationFileDriver
                 return new FileOperationResult("99", ex.Message);
             }
         }
+
+        /// <summary>
+        /// Formats an agent notification record as a fixed-width string.
+        /// </summary>
+        private static string FormatAgentRecord(AgentNotifyRecord record)
+        {
+            // COBOL fields are fixed-width; pad/truncate as needed.
+            return string.Concat(
+                record.AgentCode.PadRight(10).Substring(0, 10),
+                record.AgentName.PadRight(45).Substring(0, 45),
+                record.AgentAddress1.PadRight(50).Substring(0, 50),
+                record.AgentAddress2.PadRight(50).Substring(0, 50),
+                record.AgentCity.PadRight(20).Substring(0, 20),
+                record.AgentState.PadRight(2).Substring(0, 2),
+                record.AgentPolicyNumber.PadRight(10).Substring(0, 10),
+                record.AgentPolicyFName.PadRight(35).Substring(0, 35),
+                record.AgentPolicyMName.PadRight(1).Substring(0, 1),
+                record.AgentPolicyLName.PadRight(35).Substring(0, 35),
+                record.AgentPolicyStartDate.PadRight(10).Substring(0, 10),
+                record.AgentPolicyExpiryDate.PadRight(10).Substring(0, 10),
+                record.AgentNotifyDate.PadRight(10).Substring(0, 10),
+                record.AgentNotifyMessages.PadRight(100).Substring(0, 100)
+            );
+        }
+
+        /// <summary>
+        /// Formats a customer notification record as a fixed-width string.
+        /// </summary>
+        private static string FormatCustomerRecord(CustomerNotifyRecord record)
+        {
+            return string.Concat(
+                record.CustPolicyNumber.PadRight(10).Substring(0, 10),
+                record.CustFName.PadRight(35).Substring(0, 35),
+                record.CustMName.PadRight(1).Substring(0, 1),
+                record.CustLName.PadRight(35).Substring(0, 35),
+                record.CustPolicyStartDate.PadRight(10).Substring(0, 10),
+                record.CustPolicyExpiryDate.PadRight(10).Substring(0, 10),
+                record.CustNotifyDate.PadRight(10).Substring(0, 10),
+                record.CustNotifyMessages.PadRight(100).Substring(0, 100),
+                record.CustAgentCode.PadRight(10).Substring(0, 10),
+                record.CustAgentName.PadRight(45).Substring(0, 45),
+                record.CustStatutoryMessage.PadRight(100).Substring(0, 100)
+            );
+        }
     }
 
     /// <summary>
-    /// Main driver class for notification file operations.
+    /// Encapsulates the main driver logic for notification file operations.
     /// </summary>
     public class NotificationFileDriver
     {
@@ -274,8 +274,10 @@ namespace NotificationFileDriver
         private readonly ILogger<NotificationFileDriver> _logger;
 
         /// <summary>
-        /// Initializes a new instance of <see cref="NotificationFileDriver"/>.
+        /// Initializes a new instance of the <see cref="NotificationFileDriver"/> class.
         /// </summary>
+        /// <param name="fileService">The notification file service.</param>
+        /// <param name="logger">The logger.</param>
         public NotificationFileDriver(INotificationFileService fileService, ILogger<NotificationFileDriver> logger)
         {
             _fileService = fileService;
@@ -287,9 +289,9 @@ namespace NotificationFileDriver
         /// </summary>
         /// <param name="fileName">Logical file name (e.g., "AGENT-NOTIFY-FILE").</param>
         /// <param name="operationType">Operation type ("OPEN", "CLOSE", "WRITE").</param>
-        /// <param name="agentRecord">Agent record (if applicable).</param>
-        /// <param name="customerRecord">Customer record (if applicable).</param>
-        /// <param name="reportRecord">Report record (if applicable).</param>
+        /// <param name="agentRecord">Agent record (for WRITE).</param>
+        /// <param name="customerRecord">Customer record (for WRITE).</param>
+        /// <param name="reportRecord">Report record (for WRITE).</param>
         /// <returns>File operation result.</returns>
         public async Task<FileOperationResult> ExecuteAsync(
             string fileName,
@@ -317,27 +319,26 @@ namespace NotificationFileDriver
                 switch (opType)
                 {
                     case FileOperationType.Open:
-                        return await _fileService.OpenAsync(fileName);
+                        return await _fileService.OpenFileAsync(fileName);
 
                     case FileOperationType.Close:
-                        return await _fileService.CloseAsync(fileName);
+                        return await _fileService.CloseFileAsync(fileName);
 
                     case FileOperationType.Write:
-                        if (fileName == "AGENT-NOTIFY-FILE" && agentRecord != null)
-                            return await _fileService.WriteAgentAsync(fileName, agentRecord);
-
-                        if (fileName == "CUSTOMER-NOTIFY-FILE" && customerRecord != null)
-                            return await _fileService.WriteCustomerAsync(fileName, customerRecord);
-
-                        if (fileName == "NOTIFY-REPORT-FILE" && reportRecord != null)
-                            return await _fileService.WriteReportAsync(fileName, reportRecord);
-
-                        _logger.LogError("Write operation missing record for file: {FileName}", fileName);
-                        return new FileOperationResult("99", $"Missing record for file: {fileName}");
+                        return fileName switch
+                        {
+                            "AGENT-NOTIFY-FILE" when agentRecord != null =>
+                                await _fileService.WriteAgentRecordAsync(fileName, agentRecord),
+                            "CUSTOMER-NOTIFY-FILE" when customerRecord != null =>
+                                await _fileService.WriteCustomerRecordAsync(fileName, customerRecord),
+                            "NOTIFY-REPORT-FILE" when reportRecord != null =>
+                                await _fileService.WriteReportRecordAsync(fileName, reportRecord),
+                            _ =>
+                                new FileOperationResult("99", $"Missing or invalid record for file: {fileName}")
+                        };
 
                     default:
-                        _logger.LogError("Unknown operation type: {OperationType}", operationType);
-                        return new FileOperationResult("99", $"Unknown operation type: {operationType}");
+                        return new FileOperationResult("99", "Unknown operation.");
                 }
             }
             catch (Exception ex)
@@ -345,54 +346,6 @@ namespace NotificationFileDriver
                 _logger.LogError(ex, "Error executing operation {OperationType} on file {FileName}", operationType, fileName);
                 return new FileOperationResult("99", ex.Message);
             }
-        }
-    }
-
-    /// <summary>
-    /// Example of dependency injection setup and usage.
-    /// </summary>
-    public static class Program
-    {
-        /// <summary>
-        /// Entry point for demonstration purposes.
-        /// </summary>
-        public static async Task Main(string[] args)
-        {
-            // Setup DI and logging
-            var serviceCollection = new ServiceCollection();
-            serviceCollection.AddLogging(configure => configure.AddConsole());
-            serviceCollection.AddSingleton<INotificationFileService, NotificationFileService>();
-            serviceCollection.AddSingleton<NotificationFileDriver>();
-
-            var serviceProvider = serviceCollection.BuildServiceProvider();
-            var driver = serviceProvider.GetRequiredService<NotificationFileDriver>();
-
-            // Example usage
-            var agentRecord = new AgentNotifyRecord(
-                AgentCode: "A123456789",
-                AgentName: "John Doe",
-                AgentAddress1: "123 Main St",
-                AgentAddress2: "Suite 100",
-                AgentCity: "Copenhagen",
-                AgentState: "DK",
-                AgentPolicyNumber: "P987654321",
-                AgentPolicyFName: "Jane",
-                AgentPolicyMName: "M",
-                AgentPolicyLName: "Smith",
-                AgentPolicyStartDate: "2024-01-01",
-                AgentPolicyExpiryDate: "2025-01-01",
-                AgentNotifyDate: "2024-06-01",
-                AgentNotifyMessages: "Policy renewal notification."
-            );
-
-            var resultOpen = await driver.ExecuteAsync("AGENT-NOTIFY-FILE", "OPEN");
-            Console.WriteLine($"Open Result: {resultOpen.StatusCode} {resultOpen.ErrorMessage}");
-
-            var resultWrite = await driver.ExecuteAsync("AGENT-NOTIFY-FILE", "WRITE", agentRecord: agentRecord);
-            Console.WriteLine($"Write Result: {resultWrite.StatusCode} {resultWrite.ErrorMessage}");
-
-            var resultClose = await driver.ExecuteAsync("AGENT-NOTIFY-FILE", "CLOSE");
-            Console.WriteLine($"Close Result: {resultClose.StatusCode} {resultClose.ErrorMessage}");
         }
     }
 }

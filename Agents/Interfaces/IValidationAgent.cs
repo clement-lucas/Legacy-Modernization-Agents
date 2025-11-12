@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
-using CobolModernization.Models;
+using CobolToQuarkusMigration.Models;
 
-namespace CobolModernization.Agents.Interfaces
+namespace CobolToQuarkusMigration.Agents.Interfaces
 {
     /// <summary>
     /// Interface for validation agent that compares converted code with original COBOL

@@ -1,13 +1,13 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
-using CobolModernization.Agents.Interfaces;
-using CobolModernization.Models;
-using CobolModernization.Helpers;
+using CobolToQuarkusMigration.Agents.Interfaces;
+using CobolToQuarkusMigration.Models;
+using CobolToQuarkusMigration.Helpers;
 using System.Diagnostics;
 using System.Text;
 
-namespace CobolModernization.Agents;
+namespace CobolToQuarkusMigration.Agents;
 
 /// <summary>
 /// Implementation of the unit test agent with AI-powered test generation.

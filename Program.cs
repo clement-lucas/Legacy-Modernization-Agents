@@ -1,9 +1,9 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using System.CommandLine;
-using CobolModernization;
-using CobolModernization.Helpers;
-using CobolModernization.Models;
+using CobolToQuarkusMigration;
+using CobolToQuarkusMigration.Helpers;
+using CobolToQuarkusMigration.Models;
 
 // Create logger factory
 var loggerFactory = LoggerFactory.Create(builder =>

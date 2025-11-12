@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging;
 using System.Text;
 using System.Text.Json;
 
-namespace CobolModernization.Helpers;
+namespace CobolToQuarkusMigration.Helpers;
 
 /// <summary>
 /// Enhanced logger with ASCII progress bars, API call tracking, color-coded console output, and comprehensive file logging, because its cool .

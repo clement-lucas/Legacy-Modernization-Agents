@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
-using CobolModernization.Models;
+using CobolToQuarkusMigration.Models;
 
-namespace CobolModernization.Helpers;
+namespace CobolToQuarkusMigration.Helpers;
 
 /// <summary>
 /// Helper class for file operations.

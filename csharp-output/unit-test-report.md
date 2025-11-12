@@ -1,22 +1,22 @@
 # Unit Test Report
 
-**Generated:** 2025-11-11 07:44:11 UTC
+**Generated:** 2025-11-12 14:28:00 UTC
 **Target Language:** C#
 **Test Framework:** xUnit + Moq
 
 ## Summary
 
-Generated 228 unit tests across 12 test files 
+Generated 234 unit tests across 12 test files 
 for 12 C# source files using xUnit + Moq.
 
 Estimated code coverage: 85.0%
 
 Test Distribution:
-  • Business Logic Tests: 170
-  • Edge Case Tests: 3
-  • Error Handling Tests: 46
-  • Data Validation Tests: 2
-  • Integration Tests: 7
+  • Business Logic Tests: 162
+  • Edge Case Tests: 1
+  • Error Handling Tests: 42
+  • Data Validation Tests: 18
+  • Integration Tests: 11
   • Performance Tests: 0
 
 
@@ -25,36 +25,36 @@ Test Distribution:
 | Metric | Value |
 |--------|-------|
 | Total Test Files | 12 |
-| Total Test Methods | 228 |
+| Total Test Methods | 234 |
 | Source Files Covered | 12 |
 | Estimated Coverage | 85.0% |
-| Avg Tests/File | 19.0 |
+| Avg Tests/File | 19.5 |
 
 ## Test Files
 
 | Test File | Source File | Test Class | Tests | Types Covered |
 |-----------|-------------|------------|-------|---------------|
-| PolicyCursorDriverTests.cs | PolicyCursorDriver.cs | class | 17 | Error Handling, Business Logic, Edge Case |
-| TrackingRepositoryTests.cs | TrackingRepository.cs | class | 15 | Business Logic, Error Handling, Integration |
-| AgentFileExceptionTests.cs | AgentFileException.cs | class | 24 | Error Handling, Business Logic, Integration |
-| NotificationFileServiceTests.cs | NotificationFileService.cs | class | 19 | Business Logic, Error Handling |
-| forTests.cs | for.cs | class | 20 | Business Logic, Error Handling |
-| containingTests.cs | containing.cs | class | 12 | Business Logic, Data Validation, Edge Case, Error Handling, Integration |
-| isTests.cs | is.cs | class | 18 | Business Logic |
-| containingTests.cs | containing.cs | class | 16 | Business Logic |
-| isTests.cs | is.cs | class | 25 | Business Logic |
-| mapsTests.cs | maps.cs | class | 19 | Business Logic |
-| PolicyRepositoryTests.cs | PolicyRepository.cs | class | 19 | Business Logic, Error Handling, Integration, Edge Case |
-| forTests.cs | for.cs | class | 24 | Business Logic, Error Handling, Integration, Data Validation |
+| PolicyDriverTests.cs | PolicyDriver.cs | class | 15 | Error Handling, Business Logic, Data Validation |
+| TrackingRepositoryTests.cs | TrackingRepository.cs | class | 13 | Business Logic, Error Handling, Integration |
+| AgentFileInputTests.cs | AgentFileInput.cs | class | 14 | Business Logic, Error Handling |
+| NotificationFileServiceTests.cs | NotificationFileService.cs | class | 27 | Business Logic, Error Handling, Data Validation |
+| PolicyExpiryBatchProcessorTests.cs | PolicyExpiryBatchProcessor.cs | class | 21 | Integration, Business Logic, Error Handling |
+| forTests.cs | for.cs | class | 17 | Business Logic, Integration |
+| AgentServiceTests.cs | AgentService.cs | class | 19 | Error Handling, Data Validation, Business Logic, Integration |
+| PolicyRecordTests.cs | PolicyRecord.cs | class | 25 | Data Validation, Business Logic |
+| containingTests.cs | containing.cs | class | 25 | Business Logic, Integration |
+| CoverageRepositoryTests.cs | CoverageRepository.cs | class | 16 | Business Logic, Error Handling, Integration |
+| PolicyRepositoryTests.cs | PolicyRepository.cs | class | 25 | Business Logic, Error Handling, Integration, Edge Case |
+| TrackingRecordTests.cs | TrackingRecord.cs | class | 17 | Data Validation, Business Logic |
 
 ## Coverage by Test Type
 
 ```
-Business Logic Tests:  170 (74.6%)
-Edge Case Tests:         3 (1.3%)
-Error Handling Tests:   46 (20.2%)
-Data Validation Tests:   2 (0.9%)
-Integration Tests:       7 (3.1%)
+Business Logic Tests:  162 (69.2%)
+Edge Case Tests:         1 (0.4%)
+Error Handling Tests:   42 (17.9%)
+Data Validation Tests:  18 (7.7%)
+Integration Tests:      11 (4.7%)
 Performance Tests:       0 (0.0%)
 ```
 
