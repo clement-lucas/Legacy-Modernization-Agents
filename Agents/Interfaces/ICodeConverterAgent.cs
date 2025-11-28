@@ -26,6 +26,14 @@ public interface ICodeConverterAgent
     Task<List<CodeFile>> ConvertAsync(List<CobolFile> cobolFiles, List<CobolAnalysis> cobolAnalyses, Action<int, int>? progressCallback = null);
 
     /// <summary>
+    /// Creates a project file (e.g., .csproj, pom.xml) for the converted code.
+    /// </summary>
+    /// <param name="codeFiles">The converted code files.</param>
+    /// <param name="outputFolder">The output folder for the project.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    Task CreateProjectAsync(List<CodeFile> codeFiles, string outputFolder);
+
+    /// <summary>
     /// Gets the target language for this converter.
     /// </summary>
     string TargetLanguage { get; }
@@ -34,4 +42,12 @@ public interface ICodeConverterAgent
     /// Gets the file extension for the target language.
     /// </summary>
     string FileExtension { get; }
+
+    /// <summary>
+    /// Validates that all COBOL files were successfully converted.
+    /// </summary>
+    /// <param name="cobolFiles">The original COBOL files.</param>
+    /// <param name="convertedFiles">The converted code files.</param>
+    /// <returns>A validation result containing success status and details.</returns>
+    (bool success, string message, List<string> missingFiles) ValidateConversion(List<CobolFile> cobolFiles, List<CodeFile> convertedFiles);
 }

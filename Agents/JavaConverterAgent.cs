@@ -625,4 +625,64 @@ public class {{className}} {
 
         return sanitizedContent;
     }
+
+    /// <inheritdoc/>
+    public Task CreateProjectAsync(List<CodeFile> codeFiles, string outputFolder)
+    {
+        _logger.LogInformation("Java project generation (pom.xml) not yet implemented");
+        // TODO: Implement pom.xml or build.gradle generation for Java/Quarkus projects
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Validates that all COBOL files were successfully converted.
+    /// </summary>
+    /// <param name="cobolFiles">The original COBOL files.</param>
+    /// <param name="convertedFiles">The converted code files.</param>
+    /// <returns>A validation result containing success status and details.</returns>
+    public (bool success, string message, List<string> missingFiles) ValidateConversion(
+        List<CobolFile> cobolFiles,
+        List<CodeFile> convertedFiles)
+    {
+        _logger.LogInformation("=== Validating Conversion Completeness ===");
+
+        var missingFiles = new List<string>();
+        var convertedFileNames = new HashSet<string>(
+            convertedFiles.Select(f => Path.GetFileNameWithoutExtension(f.FileName)),
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (var cobolFile in cobolFiles)
+        {
+            var cobolBaseName = Path.GetFileNameWithoutExtension(cobolFile.FileName);
+
+            // Check if this COBOL file has a corresponding converted file
+            if (!convertedFileNames.Contains(cobolBaseName))
+            {
+                missingFiles.Add(cobolFile.FileName);
+                _logger.LogWarning($"❌ Missing conversion for: {cobolFile.FileName}");
+            }
+            else
+            {
+                _logger.LogInformation($"✅ Converted: {cobolFile.FileName}");
+            }
+        }
+
+        bool success = missingFiles.Count == 0;
+        string message;
+
+        if (success)
+        {
+            message = $"✅ All {cobolFiles.Count} COBOL files were successfully converted.";
+            _logger.LogInformation(message);
+        }
+        else
+        {
+            message = $"⚠️ Conversion incomplete: {missingFiles.Count} of {cobolFiles.Count} files were not converted.";
+            _logger.LogWarning(message);
+            _logger.LogWarning($"Missing files: {string.Join(", ", missingFiles)}");
+        }
+
+        _logger.LogInformation("=== Validation Complete ===");
+        return (success, message, missingFiles);
+    }
 }

@@ -265,6 +265,23 @@ public class MigrationProcess
                 $"Generated {codeFiles.Count} {langName} files from COBOL sources");
             _enhancedLogger.ShowSuccess($"{langName} conversion complete - {codeFiles.Count} {langName} files generated");
 
+            // Validate conversion completeness
+            _logger.LogInformation("Validating conversion completeness...");
+            var (validationSuccess, validationMessage, missingFiles) = _codeConverterAgent.ValidateConversion(cobolFiles, codeFiles);
+
+            if (!validationSuccess)
+            {
+                _enhancedLogger.ShowWarning(validationMessage);
+                foreach (var missingFile in missingFiles)
+                {
+                    _enhancedLogger.ShowWarning($"  ⚠️ Not converted: {missingFile}");
+                }
+            }
+            else
+            {
+                _enhancedLogger.ShowSuccess(validationMessage);
+            }
+
             // Step 5: Save the generated files
             var saveLangName = targetLang == TargetLanguage.CSharp ? "C#" : "Java";
             var fileExtension = targetLang == TargetLanguage.CSharp ? ".cs" : ".java";
@@ -299,7 +316,31 @@ public class MigrationProcess
                 _enhancedLogger.LogBehindTheScenes("FILE_OUTPUT", "CODE_FILE_SAVED",
                     $"Saved {javaFile.FileName} ({javaFile.Content.Length} chars)");
                 progressCallback?.Invoke($"Saving {saveLangName} files ({i + 1}/{javaFiles.Count})", 5, totalSteps);
-            }            // Step 6: Generate migration report
+            }
+
+            _enhancedLogger.ShowSuccess($"Saved {javaFiles.Count} {saveLangName} files");
+
+            // Step 5.5: Create project file and validate compilation (C# only)
+            if (targetLang == TargetLanguage.CSharp)
+            {
+                _enhancedLogger.ShowStep(5, totalSteps, "Project Creation", "Generating .csproj and validating compilation");
+                _enhancedLogger.LogBehindTheScenes("MIGRATION", "PROJECT_GENERATION_START",
+                    "Creating .NET project file and verifying it compiles");
+                progressCallback?.Invoke("Creating .NET project", 5, totalSteps);
+
+                try
+                {
+                    await _codeConverterAgent.CreateProjectAsync(javaFiles.Cast<CodeFile>().ToList(), javaOutputFolder);
+                    _enhancedLogger.ShowSuccess("Project file created and compilation validated");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to create or validate project file");
+                    _enhancedLogger.ShowWarning($"Project generation encountered issues: {ex.Message}");
+                }
+            }
+
+            // Step 6: Generate migration report
             _enhancedLogger.ShowStep(6, totalSteps, "Report Generation", "Creating migration summary and metrics");
             _enhancedLogger.LogBehindTheScenes("MIGRATION", "STEP_6_START",
                 "Generating comprehensive migration report and documentation");
